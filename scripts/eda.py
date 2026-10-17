@@ -25,17 +25,15 @@ import argparse
 import logging
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
+
+from scripts.config import BIG_ECONOMIES_PT, DEFAULT_DATASET
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
 )
 log = logging.getLogger("energix.eda")
-
-ROOT            = Path(__file__).resolve().parent.parent
-DEFAULT_DATASET = ROOT / "dataset" / "dataset_renewable.csv"
 
 SEP = "=" * 70
 SEP2 = "─" * 70
@@ -163,7 +161,7 @@ def inspect_ranking(df: pd.DataFrame) -> None:
 def inspect_big_economies(df: pd.DataFrame) -> None:
     section("6. GRANDES ECONOMIAS — 2000 a 2025")
 
-    countries = ["Brazil", "China", "Germany", "United States", "France", "India"]
+    countries = list(BIG_ECONOMIES_PT)
     data = df[df["country"].isin(countries) & df["year"].between(2000, 2025)]
     pivot = (
         data.pivot(index="year", columns="country", values="renewables_share_elec")
