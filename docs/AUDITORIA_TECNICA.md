@@ -105,7 +105,41 @@ Cada linha abaixo corresponde a um commit atômico, em ordem, mantendo o site fu
 
 ---
 
-## 4. Evoluções sugeridas (fora do escopo desta revisão)
+## 4. Status (atualizado em outubro/2026)
+
+O plano foi executado em 20 commits, de `d17fcf3` a esta atualização. A ordem final ficou um pouco diferente da proposta na seção 3: o ajuste do `vercel.json` foi antecipado para antes de o dashboard carregar o `data.js`, e o SRI do Chart.js ganhou um commit próprio.
+
+| Achado | Status | Commit(s) | Observação |
+|---|---|---|---|
+| M1 — eixo temporal | ✅ Resolvido | `826b020` | Coeficientes agora em função de t = ano − 2000 (β₀ = 18,1). R² = 0,996 em qualquer ambiente. **Nota:** na máquina usada para as correções o código antigo já dava 0,996. O 0,90 da revisão original veio de outro ambiente, o que confirma que o resultado dependia da versão do numpy/BLAS. |
+| M2 — métricas só in-sample | ✅ Resolvido | `ebdf3dd` | Backtest 2021–2025: MAE 0,62 pp, RMSE 0,66 pp. |
+| M3 — sinal do delta no log | ✅ Resolvido | `826b020` | |
+| M4 — K sem justificativa | ✅ Resolvido | `8bb6089` | Silhouette registrado (0,42). K = 3 teria 0,49, mas junta solar e eólica. A justificativa está no `config.py` e no README. |
+| M5 — features composicionais | 📝 Documentado | `7016c47` | Registrado nas limitações do README. A transformação log-ratio fica como evolução. |
+| M6 — 2025 parcial | 📝 Documentado | `75f9f43`, `7016c47` | Ranking, clustering e KPI de países usam 2024. Limitação descrita no README. |
+| E1 — `CONTINENT_MAP` duplicado | ✅ Resolvido | `9fc1200` | |
+| E2 — países em “Outros” | ✅ Resolvido | `27703d9` | 0 países do ranking sem continente (coberto por teste). |
+| E3 — KPIs fixos | ✅ Resolvido | `75f9f43` | `countries` = 195 e `years` = 26, calculados. |
+| E4 — código morto | ✅ Resolvido | `75f9f43` | |
+| E5 — supressão global de warnings | ✅ Resolvido | `75f9f43` | O pipeline roda sem warnings, mesmo com `-W error::FutureWarning`. |
+| E6 — `basicConfig`/`sys.exit` | ✅ Resolvido | `75f9f43` | |
+| E7 — anos literais | ✅ Resolvido | `9fc1200`, `75f9f43` | |
+| E8 — dependências | ✅ Resolvido | `e8f0f73` | |
+| D1 — dados duplicados no `app.js` | ✅ Resolvido | `353b1d2`, `0dc6693`, `2755e14`, `8343e5f` | `app.js` caiu de 85 KB para 29 KB. Um teste garante que `dashboard/data/` está sincronizado com o pipeline. |
+| D2 — rewrite redundante | ✅ Resolvido | `ce68545` | Também corrigido o `Content-Type` que seria aplicado ao `data.js`. |
+| D3 — `.vercelignore` | ✅ Resolvido | `ce68545` | |
+| — SRI do Chart.js | ✅ Resolvido | `d946552` | Hash conferido pela API do cdnjs e sobre o arquivo baixado. |
+| R1–R4 — README e licença | ✅ Resolvido | `e72d2e9`, `7016c47` | |
+| R5 — topics | ✅ Resolvido | — | Feito direto no GitHub. |
+| G1/G2 — histórico | ✅ Resolvido daqui em diante | todos acima | Os 8 commits antigos não foram reescritos: reescrever um histórico já publicado exigiria force push. A partir daqui o histórico segue Conventional Commits, com um commit por mudança lógica. |
+
+**Qualidade automatizada:** 21 testes (`pytest`), lint (`ruff`) e execução completa do pipeline no GitHub Actions, com Python 3.10 e 3.12.
+
+**Fora do repositório:** a descrição do *About* no GitHub foi atualizada de “190 países” para “195 países”.
+
+---
+
+## 5. Evoluções sugeridas (fora do escopo desta revisão)
 
 - Comparar a regressão polinomial com modelos de série temporal (ETS, ARIMA) e publicar intervalos de previsão.
 - Gerar o dashboard por país (seleção dinâmica) a partir do mesmo `data.js`.
