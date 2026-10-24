@@ -8,7 +8,7 @@
 ║  os valores até 2030.                                             ║
 ║                                                                   ║
 ║  Modelo:                                                          ║
-║    ŷ = β₀ + β₁·t + β₂·t²                                        ║
+║    ŷ = β₀ + β₁·t + β₂·t²,  com t = ano − 2000                    ║
 ║    Estimador: OLS via scikit-learn                                ║
 ║    Features:  PolynomialFeatures(degree=2, include_bias=True)    ║
 ║                                                                   ║
@@ -18,8 +18,8 @@
 ║    RMSE — raiz do erro quadrático médio                           ║
 ║                                                                   ║
 ║  Uso standalone:                                                  ║
-║    python scripts/forecast.py                                     ║
-║    python scripts/forecast.py --degree 3 --horizon 2035          ║
+║    python -m scripts.forecast                                     ║
+║    python -m scripts.forecast --degree 3 --horizon 2035          ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
 
@@ -34,13 +34,21 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import PolynomialFeatures
 
+from scripts.config import (
+    DEFAULT_DATASET,
+    DEFAULT_OUTPUT,
+    FORECAST_YEAR_END,
+    POLY_DEGREE,
+    TARGET_COL,
+    YEAR_START,
+)
+
 log = logging.getLogger("energix.forecast")
 
-# ── Constantes ─────────────────────────────────────────────────────
-POLY_DEGREE   = 2
-FORECAST_YEAR_START = 2026
-FORECAST_YEAR_END   = 2030
-TARGET_COL    = "renewables_share_elec"
+# O polinômio é ajustado sobre t = ano − TIME_OFFSET. Com o ano bruto,
+# ano² passa de 4 milhões e a matriz de features fica mal condicionada:
+# os coeficientes e o próprio R² passam a depender da versão do numpy/BLAS.
+TIME_OFFSET = YEAR_START
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -66,7 +74,8 @@ def run_polynomial_forecast(
             r2               — coeficiente de determinação
             mae              — erro absoluto médio (histórico)
             rmse             — raiz do erro quadrático médio (histórico)
-            coefficients     — coeficientes [β₀, β₁, β₂, …]
+            time_offset      — ano usado como origem do eixo (t = ano − time_offset)
+            coefficients     — coeficientes [β₀, β₁, β₂, …] em função de t
             historical_fitted— valores ajustados para os anos históricos
             forecast         — projeção para cada ano futuro
     """
@@ -80,9 +89,10 @@ def run_polynomial_forecast(
         degree, int(years.min()), int(years.max()), len(y),
     )
 
-    # Transformação polinomial
+    # Transformação polinomial sobre o eixo temporal centralizado
+    t      = years - TIME_OFFSET
     poly   = PolynomialFeatures(degree=degree, include_bias=True)
-    X_poly = poly.fit_transform(years)
+    X_poly = poly.fit_transform(t)
 
     # Ajuste OLS
     model  = LinearRegression(fit_intercept=False)
@@ -102,12 +112,13 @@ def run_polynomial_forecast(
         for yr, f in zip(series["year"].values, y_pred)
     ]
 
-    # Projeção futura
-    future_years = np.arange(FORECAST_YEAR_START, forecast_end + 1).reshape(-1, 1)
-    X_fut        = poly.transform(future_years)
+    # Projeção futura (a partir do ano seguinte ao último observado)
+    last_year    = int(years.max())
+    future_years = np.arange(last_year + 1, forecast_end + 1).reshape(-1, 1)
+    X_fut        = poly.transform(future_years - TIME_OFFSET)
     y_fut        = model.predict(X_fut)
 
-    prev_val = float(series[series["year"] == series["year"].max()][TARGET_COL].values[0])
+    prev_val = float(y[-1])
     forecast_list = []
     for yr, val in zip(future_years.flatten(), y_fut):
         forecast_list.append({
@@ -117,15 +128,16 @@ def run_polynomial_forecast(
         })
         prev_val = float(val)
 
-    log.info("Projeção 2026–%d:", forecast_end)
+    log.info("Projeção %d–%d:", last_year + 1, forecast_end)
     for row in forecast_list:
-        log.info("  %d → %.2f%%  (Δ +%.2f pp)", row["year"], row["value"], row["delta"])
+        log.info("  %d → %.2f%%  (Δ %+.2f pp)", row["year"], row["value"], row["delta"])
 
     return {
         "r2":               round(r2,   4),
         "mae":              round(mae,  4),
         "rmse":             round(rmse, 4),
         "degree":           degree,
+        "time_offset":      TIME_OFFSET,
         "coefficients":     [round(float(c), 6) for c in model.coef_],
         "historical_fitted": historical_fitted,
         "forecast":         [{"year": r["year"], "value": r["value"]} for r in forecast_list],
@@ -137,16 +149,14 @@ def run_polynomial_forecast(
 # ══════════════════════════════════════════════════════════════════
 
 def _parse_args() -> argparse.Namespace:
-    ROOT = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description="Energix — Regressão Polinomial & Forecast")
-    parser.add_argument("--dataset", type=Path,
-                        default=ROOT / "dataset" / "dataset_renewable.csv")
+    parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--degree",  type=int, default=POLY_DEGREE,
                         help=f"Grau do polinômio (padrão: {POLY_DEGREE})")
     parser.add_argument("--horizon", type=int, default=FORECAST_YEAR_END,
                         help=f"Último ano da projeção (padrão: {FORECAST_YEAR_END})")
     parser.add_argument("--output",  type=Path,
-                        default=ROOT / "dashboard" / "data" / "forecast.json")
+                        default=DEFAULT_OUTPUT / "forecast.json")
     return parser.parse_args()
 
 
