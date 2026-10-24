@@ -16,6 +16,7 @@
 ║    R²  — coeficiente de determinação                              ║
 ║    MAE — erro absoluto médio                                      ║
 ║    RMSE — raiz do erro quadrático médio                           ║
+║    Backtest — MAE/RMSE fora da amostra nos 5 últimos anos         ║
 ║                                                                   ║
 ║  Uso standalone:                                                  ║
 ║    python -m scripts.forecast                                     ║
@@ -35,6 +36,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import PolynomialFeatures
 
 from scripts.config import (
+    BACKTEST_YEARS,
     DEFAULT_DATASET,
     DEFAULT_OUTPUT,
     FORECAST_YEAR_END,
@@ -49,6 +51,57 @@ log = logging.getLogger("energix.forecast")
 # ano² passa de 4 milhões e a matriz de features fica mal condicionada:
 # os coeficientes e o próprio R² passam a depender da versão do numpy/BLAS.
 TIME_OFFSET = YEAR_START
+
+
+# ══════════════════════════════════════════════════════════════════
+#  VALIDAÇÃO TEMPORAL
+# ══════════════════════════════════════════════════════════════════
+
+def temporal_backtest(
+    years,
+    y,
+    degree: int = POLY_DEGREE,
+    holdout: int = BACKTEST_YEARS,
+) -> dict:
+    """
+    Treina com todos os anos menos os `holdout` finais e mede o erro neles.
+
+    As métricas do ajuste completo (R², MAE, RMSE) são calculadas sobre os
+    mesmos pontos usados no treino e, por isso, são otimistas. O backtest
+    simula o uso real do modelo: prever anos que ele ainda não viu.
+
+    Args:
+        years   — anos da série, em ordem crescente
+        y       — valores observados para cada ano
+        degree  — grau do polinômio (padrão: 2)
+        holdout — quantidade de anos finais reservados para teste
+
+    Returns:
+        dict com o último ano de treino, os anos de teste, MAE, RMSE e os
+        valores previstos e observados no período de teste.
+    """
+    years = np.asarray(years).reshape(-1, 1)
+    y     = np.asarray(y, dtype=float)
+
+    if holdout <= 0 or len(y) <= holdout + degree:
+        raise ValueError("Série curta demais para o backtest solicitado.")
+
+    t     = years - TIME_OFFSET
+    poly  = PolynomialFeatures(degree=degree, include_bias=True)
+    model = LinearRegression(fit_intercept=False)
+    model.fit(poly.fit_transform(t[:-holdout]), y[:-holdout])
+
+    y_test = y[-holdout:]
+    y_hat  = model.predict(poly.transform(t[-holdout:]))
+
+    return {
+        "train_end":  int(years[-holdout - 1, 0]),
+        "test_years": [int(v) for v in years[-holdout:, 0]],
+        "mae":        round(float(mean_absolute_error(y_test, y_hat)), 4),
+        "rmse":       round(float(np.sqrt(mean_squared_error(y_test, y_hat))), 4),
+        "predicted":  [round(float(v), 2) for v in y_hat],
+        "actual":     [round(float(v), 2) for v in y_test],
+    }
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -78,6 +131,7 @@ def run_polynomial_forecast(
             coefficients     — coeficientes [β₀, β₁, β₂, …] em função de t
             historical_fitted— valores ajustados para os anos históricos
             forecast         — projeção para cada ano futuro
+            backtest         — erro fora da amostra (ver temporal_backtest)
     """
     # Preparar dados
     series = world.sort_values("year").dropna(subset=[TARGET_COL])
@@ -105,6 +159,14 @@ def run_polynomial_forecast(
     rmse   = float(np.sqrt(mean_squared_error(y, y_pred)))
 
     log.info("R²=%.4f  |  MAE=%.4f  |  RMSE=%.4f", r2, mae, rmse)
+
+    # Validação fora da amostra
+    backtest = temporal_backtest(years, y, degree=degree)
+    log.info(
+        "Backtest (treino até %d, teste %d–%d): MAE=%.4f  |  RMSE=%.4f",
+        backtest["train_end"], backtest["test_years"][0], backtest["test_years"][-1],
+        backtest["mae"], backtest["rmse"],
+    )
 
     # Valores ajustados históricos
     historical_fitted = [
@@ -141,6 +203,7 @@ def run_polynomial_forecast(
         "coefficients":     [round(float(c), 6) for c in model.coef_],
         "historical_fitted": historical_fitted,
         "forecast":         [{"year": r["year"], "value": r["value"]} for r in forecast_list],
+        "backtest":         backtest,
     }
 
 
@@ -183,6 +246,11 @@ if __name__ == "__main__":
     print(f"  R²   = {result['r2']}")
     print(f"  MAE  = {result['mae']}")
     print(f"  RMSE = {result['rmse']}")
+    bt = result["backtest"]
+    print(f"\n  Backtest (treino até {bt['train_end']}, teste "
+          f"{bt['test_years'][0]}–{bt['test_years'][-1]})")
+    print(f"  MAE  = {bt['mae']}")
+    print(f"  RMSE = {bt['rmse']}")
     print("\n  Projeção:")
     for row in result["forecast"]:
         print(f"    {row['year']} → {row['value']:.2f}%")
