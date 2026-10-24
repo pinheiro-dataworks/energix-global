@@ -1,19 +1,12 @@
 # ══════════════════════════════════════════════════════
 #  ENERGIX GLOBAL — Dependências Python
 #  Instale com:  pip install -r requirements.txt
+#  Para desenvolvimento (testes e lint): requirements-dev.txt
 # ══════════════════════════════════════════════════════
 
 # Manipulação e análise de dados
-pandas>=2.0.0
-numpy>=1.24.0
+pandas>=2.0,<3.0
+numpy>=1.24,<3.0
 
 # Machine Learning
-scikit-learn>=1.3.0
-
-# (Opcional) Visualização exploratória local
-# matplotlib>=3.7.0
-# seaborn>=0.12.0
-# plotly>=5.15.0
-
-# (Opcional) Servidor de desenvolvimento local
-# Não é necessário para o deploy no Vercel
+scikit-learn>=1.3,<2.0
