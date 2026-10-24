@@ -6,8 +6,8 @@
 ╠══════════════════════════════════════════════════════════════════╣
 ║  Descrição:                                                       ║
 ║  Pipeline completo de ETL + Machine Learning que processa o      ║
-║  dataset de energia renovável e gera o arquivo data.json         ║
-║  consumido pelo dashboard.                                        ║
+║  dataset de energia renovável e gera os arquivos data.json e     ║
+║  data.js (este último é o que o dashboard carrega).              ║
 ║                                                                   ║
 ║  Etapas:                                                          ║
 ║  1. Carregamento e validação do dataset                           ║
@@ -15,7 +15,7 @@
 ║  3. Cálculo dos KPIs e indicadores globais                        ║
 ║  4. K-Means Clustering (5 clusters)                               ║
 ║  5. Regressão Polinomial Grau 2 + Projeção 2026–2030             ║
-║  6. Serialização para JSON                                        ║
+║  6. Serialização para data.json e data.js                        ║
 ║                                                                   ║
 ║  Uso (a partir da raiz do repositório):                           ║
 ║    python -m scripts.process_data                                 ║
@@ -292,6 +292,44 @@ def build_filters(df: pd.DataFrame, cluster_names: list[str]) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════
+#  6. SAÍDA
+# ══════════════════════════════════════════════════════════════════
+
+DATA_JS_HEADER = (
+    "/* Arquivo gerado automaticamente por scripts/process_data.py.\n"
+    " * Não edite manualmente — execute o pipeline para atualizar. */\n"
+)
+
+
+def write_outputs(data: dict, output_dir: Path) -> tuple[Path, Path]:
+    """
+    Grava o payload em dois formatos com o mesmo conteúdo:
+
+    - data.json — legível, para inspeção e consumo por outras ferramentas;
+    - data.js   — define window.ENERGIX_DATA e é carregado pelo dashboard
+                  via <script>, o que dispensa fetch() e funciona até
+                  abrindo o index.html direto do disco.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    json_path = output_dir / "data.json"
+    json_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",  # mesmo conteúdo byte a byte em qualquer SO
+    )
+
+    js_path = output_dir / "data.js"
+    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    js_path.write_text(
+        f"{DATA_JS_HEADER}window.ENERGIX_DATA = {payload};\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    return json_path, js_path
+
+
+# ══════════════════════════════════════════════════════════════════
 #  PIPELINE PRINCIPAL
 # ══════════════════════════════════════════════════════════════════
 
@@ -350,15 +388,11 @@ def run_pipeline(dataset_path: Path, output_dir: Path) -> dict:
     df   = load_dataset(dataset_path)
     data = build_data(df)
 
-    # Salvar
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "data.json"
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    json_path, js_path = write_outputs(data, Path(output_dir))
 
-    size_kb = output_path.stat().st_size / 1024
     log.info("=" * 60)
-    log.info("data.json salvo em: %s  (%.1f KB)", output_path, size_kb)
+    for path in (json_path, js_path):
+        log.info("%s salvo em: %s  (%.1f KB)", path.name, path, path.stat().st_size / 1024)
     log.info("Ranking: %d países  |  Clusters: %d países no scatter",
              len(data["ranking"]), len(data["scatter_data"]))
     log.info("Pipeline concluído com sucesso ✓")
@@ -381,7 +415,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output", type=Path, default=DEFAULT_OUTPUT,
-        help=f"Pasta de saída para data.json (padrão: {DEFAULT_OUTPUT})",
+        help=f"Pasta de saída para data.json e data.js (padrão: {DEFAULT_OUTPUT})",
     )
     return parser.parse_args()
 
