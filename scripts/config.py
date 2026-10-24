@@ -80,6 +80,8 @@ CONTINENT_MAP: dict[str, list[str]] = {
         "Morocco","Mozambique","Namibia","Niger","Nigeria","Rwanda","Sao Tome and Principe",
         "Senegal","Seychelles","Sierra Leone","Somalia","South Africa","South Sudan","Sudan",
         "Tanzania","Togo","Tunisia","Uganda","Zambia","Zimbabwe",
+        # nomes usados pelo OWID
+        "Cote d'Ivoire","Reunion","Saint Helena","Western Sahara",
     ],
     "Ásia": [
         "Afghanistan","Armenia","Azerbaijan","Bahrain","Bangladesh","Bhutan","Brunei",
@@ -89,6 +91,7 @@ CONTINENT_MAP: dict[str, list[str]] = {
         "Philippines","Qatar","Saudi Arabia","Singapore","South Korea","Sri Lanka","Syria",
         "Taiwan","Tajikistan","Thailand","Timor-Leste","Turkmenistan",
         "United Arab Emirates","Uzbekistan","Vietnam","Yemen","East Timor",
+        "Hong Kong","Macao",
     ],
     "Europa": [
         "Albania","Andorra","Austria","Belarus","Belgium","Bosnia and Herzegovina",
@@ -98,6 +101,7 @@ CONTINENT_MAP: dict[str, list[str]] = {
         "Netherlands","North Macedonia","Norway","Poland","Portugal","Romania","Russia",
         "San Marino","Serbia","Slovakia","Slovenia","Spain","Sweden","Switzerland",
         "Turkey","Ukraine","United Kingdom","Vatican",
+        "Czechia","Faroe Islands","Gibraltar",
     ],
     "América do Norte": [
         "Antigua and Barbuda","Bahamas","Barbados","Belize","Canada","Costa Rica","Cuba",
@@ -105,15 +109,23 @@ CONTINENT_MAP: dict[str, list[str]] = {
         "Honduras","Jamaica","Mexico","Nicaragua","Panama","Saint Kitts and Nevis",
         "Saint Lucia","Saint Vincent and the Grenadines","Trinidad and Tobago",
         "United States",
+        # territórios do Caribe e do Atlântico Norte
+        "Aruba","Bermuda","British Virgin Islands","Cayman Islands","Curacao",
+        "Greenland","Guadeloupe","Martinique","Montserrat","Netherlands Antilles",
+        "Puerto Rico","Saint Pierre and Miquelon","Turks and Caicos Islands",
+        "United States Virgin Islands",
     ],
     "América do Sul": [
         "Argentina","Bolivia","Brazil","Chile","Colombia","Ecuador","Guyana",
         "Paraguay","Peru","Suriname","Uruguay","Venezuela",
+        "Falkland Islands","French Guiana",
     ],
     "Oceania": [
         "Australia","Fiji","French Polynesia","Kiribati","Marshall Islands","Micronesia",
         "Nauru","New Zealand","Palau","Papua New Guinea","Samoa","Solomon Islands",
-        "Tonga","Tuvalu","Vanuatu","Montserrat",
+        "Tonga","Tuvalu","Vanuatu",
+        "American Samoa","Cook Islands","Guam","Micronesia (country)",
+        "New Caledonia","Niue","Northern Mariana Islands",
     ],
 }
 
