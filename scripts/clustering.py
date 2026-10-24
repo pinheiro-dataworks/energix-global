@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 from scripts.config import (
@@ -45,6 +46,9 @@ log = logging.getLogger("energix.clustering")
 # Constantes compartilhadas (ver scripts/config.py)
 FEATURES = CLUSTER_FEATURES
 
+# A nomeação automática precisa de um cluster para cada perfil.
+MIN_CLUSTERS = len(CLUSTER_ORDER)
+
 
 # ══════════════════════════════════════════════════════════════════
 #  FUNÇÃO PRINCIPAL
@@ -64,10 +68,21 @@ def run_clustering(
         n_clusters  — número de clusters K (padrão: 5)
 
     Returns:
-        df_clust        — DataFrame filtrado com coluna 'cluster_name'
+        df_clust        — DataFrame filtrado com coluna 'cluster_name'.
+                          As métricas do agrupamento ficam em
+                          df_clust.attrs["metrics"].
         cluster_profiles — dict com perfis médios e top-5 por cluster
         scatter_data    — lista de dicts para o scatter plot
+
+    Raises:
+        ValueError — se n_clusters for menor que o número de perfis nomeados.
     """
+    if n_clusters < MIN_CLUSTERS:
+        raise ValueError(
+            f"n_clusters deve ser pelo menos {MIN_CLUSTERS} para nomear os perfis "
+            f"{', '.join(CLUSTER_ORDER)} (recebido: {n_clusters})."
+        )
+
     log.info("Preparando dados para clustering — ano: %d  |  k: %d", year, n_clusters)
 
     # Filtrar ano e países reais
@@ -86,10 +101,21 @@ def run_clustering(
     df_clust = df_clust.copy()
     df_clust["cluster_id"] = km.fit_predict(X)
 
-    log.info("Inertia: %.2f  |  Iterações: %d", km.inertia_, km.n_iter_)
+    silhouette = float(silhouette_score(X, df_clust["cluster_id"]))
+    log.info(
+        "Inertia: %.2f  |  Silhouette: %.3f  |  Iterações: %d",
+        km.inertia_, silhouette, km.n_iter_,
+    )
 
     # Nomeação automática dos clusters com base nos perfis
     df_clust, cluster_name_map = _name_clusters(df_clust)
+    df_clust.attrs["metrics"] = {
+        "k":           n_clusters,
+        "year":        year,
+        "n_countries": int(len(df_clust)),
+        "inertia":     round(float(km.inertia_), 2),
+        "silhouette":  round(silhouette, 4),
+    }
 
     log.info("Clusters nomeados:")
     for cid, cname in cluster_name_map.items():
@@ -117,6 +143,9 @@ def _name_clusters(df_clust: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     3. Fossil Dependent→ maior fossil_share_elec
     4. Solar Pioneers  → maior solar_share_elec (dos restantes)
     5. Mixed Renewables→ o que sobrar
+
+    Com K > 5, os clusters excedentes viram "Mixed Renewables 2", "3"…,
+    em ordem decrescente de participação renovável.
     """
     profiles = df_clust.groupby("cluster_id")[FEATURES].mean()
 
@@ -134,8 +163,13 @@ def _name_clusters(df_clust: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     solar_c  = int(profiles[~profiles.index.isin(assigned)]["solar_share_elec"].idxmax())
     assigned[solar_c]  = "Solar Pioneers"
 
-    mixed_c  = [x for x in profiles.index if x not in assigned][0]
-    assigned[mixed_c]  = "Mixed Renewables"
+    remaining = (
+        profiles[~profiles.index.isin(assigned)]
+        .sort_values("renewables_share_elec", ascending=False)
+        .index
+    )
+    for i, cid in enumerate(remaining):
+        assigned[int(cid)] = "Mixed Renewables" if i == 0 else f"Mixed Renewables {i + 1}"
 
     df_clust = df_clust.copy()
     df_clust["cluster_name"] = df_clust["cluster_id"].map(assigned)
@@ -146,7 +180,8 @@ def _name_clusters(df_clust: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 def _build_profiles(df_clust: pd.DataFrame) -> dict:
     """Gera o perfil médio e top-5 países de cada cluster."""
     profiles = {}
-    for name in CLUSTER_ORDER:
+    extra = sorted(set(df_clust["cluster_name"]) - set(CLUSTER_ORDER))
+    for name in [*CLUSTER_ORDER, *extra]:
         grp = df_clust[df_clust["cluster_name"] == name]
         if grp.empty:
             continue
@@ -208,7 +243,11 @@ if __name__ == "__main__":
     df = pd.read_csv(args.dataset)
     df_clust, profiles, scatter = run_clustering(df, year=args.year, n_clusters=args.k)
 
-    result = {"cluster_profiles": profiles, "scatter_data": scatter}
+    result = {
+        "metrics":          df_clust.attrs["metrics"],
+        "cluster_profiles": profiles,
+        "scatter_data":     scatter,
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)

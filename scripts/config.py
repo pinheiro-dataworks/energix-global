@@ -33,6 +33,9 @@ REQUIRED_COLS = [
 ]
 
 # ── K-Means ────────────────────────────────────────────────────────
+# K = 5 é uma escolha de interpretabilidade: um cluster por perfil
+# energético. O silhouette com K = 5 é 0,42; com K = 3 sobe para 0,49,
+# mas solar e eólica caem no mesmo grupo. O valor é logado a cada execução.
 N_CLUSTERS = 5
 RANDOM_STATE = 42
 N_INIT = 10
