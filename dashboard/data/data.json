@@ -240,9 +240,10 @@
     "mae": 0.2375,
     "rmse": 0.3057,
     "degree": 2,
+    "time_offset": 2000,
     "coefficients": [
-      120735.925314,
-      -120.576734,
+      18.109832,
+      -0.141081,
       0.030109
     ],
     "historical_fitted": [
@@ -372,7 +373,33 @@
         "year": 2030,
         "value": 40.98
       }
-    ]
+    ],
+    "backtest": {
+      "train_end": 2020,
+      "test_years": [
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "mae": 0.618,
+      "rmse": 0.6563,
+      "predicted": [
+        28.77,
+        29.99,
+        31.27,
+        32.62,
+        34.03
+      ],
+      "actual": [
+        28.1,
+        29.47,
+        30.32,
+        31.93,
+        33.76
+      ]
+    }
   },
   "matrix_2025": {
     "fossil": 57.39,
@@ -1265,7 +1292,7 @@
       "renewables": 5.6,
       "fossil": 94.4,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "Oceania"
     },
     {
       "country": "Angola",
@@ -1300,7 +1327,7 @@
       "renewables": 17.0,
       "fossil": 83.0,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "América do Norte"
     },
     {
       "country": "Australia",
@@ -1384,7 +1411,7 @@
       "renewables": 1.6,
       "fossil": 98.4,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "América do Norte"
     },
     {
       "country": "Bhutan",
@@ -1475,7 +1502,7 @@
       "renewables": 4.2,
       "fossil": 95.8,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "América do Norte"
     },
     {
       "country": "Chad",
@@ -1517,7 +1544,7 @@
       "renewables": 50.0,
       "fossil": 50.0,
       "cluster": "Solar Pioneers",
-      "continent": "Outros"
+      "continent": "Oceania"
     },
     {
       "country": "Costa Rica",
@@ -1531,7 +1558,7 @@
       "renewables": 28.9,
       "fossil": 71.1,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "África"
     },
     {
       "country": "Croatia",
@@ -1559,7 +1586,7 @@
       "renewables": 16.9,
       "fossil": 42.3,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "Europa"
     },
     {
       "country": "Democratic Republic of Congo",
@@ -1720,7 +1747,7 @@
       "renewables": 0.0,
       "fossil": 100.0,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "Europa"
     },
     {
       "country": "Greece",
@@ -1734,7 +1761,7 @@
       "renewables": 83.3,
       "fossil": 16.7,
       "cluster": "Hydro Leaders",
-      "continent": "Outros"
+      "continent": "América do Norte"
     },
     {
       "country": "Grenada",
@@ -1748,7 +1775,7 @@
       "renewables": 8.6,
       "fossil": 91.4,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "Oceania"
     },
     {
       "country": "Guatemala",
@@ -1797,7 +1824,7 @@
       "renewables": 1.0,
       "fossil": 99.0,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "Ásia"
     },
     {
       "country": "Hungary",
@@ -1972,7 +1999,7 @@
       "renewables": 30.8,
       "fossil": 69.2,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "Ásia"
     },
     {
       "country": "Madagascar",
@@ -2063,7 +2090,7 @@
       "renewables": 0.0,
       "fossil": 100.0,
       "cluster": "Fossil Dependent",
-      "continent": "Oceania"
+      "continent": "América do Norte"
     },
     {
       "country": "Morocco",
@@ -2119,7 +2146,7 @@
       "renewables": 26.9,
       "fossil": 73.1,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "Oceania"
     },
     {
       "country": "New Zealand",
@@ -2245,7 +2272,7 @@
       "renewables": 6.0,
       "fossil": 94.0,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "América do Norte"
     },
     {
       "country": "Qatar",
@@ -2504,7 +2531,7 @@
       "renewables": 3.7,
       "fossil": 96.3,
       "cluster": "Fossil Dependent",
-      "continent": "Outros"
+      "continent": "América do Norte"
     },
     {
       "country": "Uganda",
@@ -2653,6 +2680,13 @@
         "Canada"
       ]
     }
+  },
+  "cluster_metrics": {
+    "k": 5,
+    "year": 2024,
+    "n_countries": 191,
+    "inertia": 229.74,
+    "silhouette": 0.4201
   },
   "ranking": [
     {
@@ -2876,7 +2910,7 @@
       "rank": 32,
       "country": "Greenland",
       "value": 83.33,
-      "continent": "Outros",
+      "continent": "América do Norte",
       "cluster": "Hydro Leaders"
     },
     {
@@ -3121,7 +3155,7 @@
       "rank": 67,
       "country": "Cook Islands",
       "value": 50.0,
-      "continent": "Outros",
+      "continent": "Oceania",
       "cluster": "Solar Pioneers"
     },
     {
@@ -3345,7 +3379,7 @@
       "rank": 99,
       "country": "Macao",
       "value": 30.77,
-      "continent": "Outros",
+      "continent": "Ásia",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3366,7 +3400,7 @@
       "rank": 102,
       "country": "Cote d'Ivoire",
       "value": 28.92,
-      "continent": "Outros",
+      "continent": "África",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3380,7 +3414,7 @@
       "rank": 104,
       "country": "New Caledonia",
       "value": 26.92,
-      "continent": "Outros",
+      "continent": "Oceania",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3569,14 +3603,14 @@
       "rank": 131,
       "country": "Aruba",
       "value": 17.0,
-      "continent": "Outros",
+      "continent": "América do Norte",
       "cluster": "Fossil Dependent"
     },
     {
       "rank": 132,
       "country": "Czechia",
       "value": 16.89,
-      "continent": "Outros",
+      "continent": "Europa",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3737,7 +3771,7 @@
       "rank": 155,
       "country": "Guam",
       "value": 8.6,
-      "continent": "Outros",
+      "continent": "Oceania",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3758,14 +3792,14 @@
       "rank": 158,
       "country": "Puerto Rico",
       "value": 6.0,
-      "continent": "Outros",
+      "continent": "América do Norte",
       "cluster": "Fossil Dependent"
     },
     {
       "rank": 159,
       "country": "American Samoa",
       "value": 5.56,
-      "continent": "Outros",
+      "continent": "Oceania",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3807,7 +3841,7 @@
       "rank": 165,
       "country": "Cayman Islands",
       "value": 4.22,
-      "continent": "Outros",
+      "continent": "América do Norte",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3835,7 +3869,7 @@
       "rank": 169,
       "country": "Turks and Caicos Islands",
       "value": 3.7,
-      "continent": "Outros",
+      "continent": "América do Norte",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3905,7 +3939,7 @@
       "rank": 179,
       "country": "Bermuda",
       "value": 1.64,
-      "continent": "Outros",
+      "continent": "América do Norte",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3926,7 +3960,7 @@
       "rank": 182,
       "country": "Hong Kong",
       "value": 1.04,
-      "continent": "Outros",
+      "continent": "Ásia",
       "cluster": "Fossil Dependent"
     },
     {
@@ -3996,7 +4030,7 @@
       "rank": 192,
       "country": "Montserrat",
       "value": 0.0,
-      "continent": "Oceania",
+      "continent": "América do Norte",
       "cluster": "Fossil Dependent"
     },
     {
@@ -4010,7 +4044,7 @@
       "rank": 194,
       "country": "Gibraltar",
       "value": 0.0,
-      "continent": "Outros",
+      "continent": "Europa",
       "cluster": "Fossil Dependent"
     },
     {
@@ -4413,7 +4447,7 @@
     "wind_2000": 0.2,
     "fossil_2025": 57.39,
     "fossil_2000": 64.66,
-    "countries": 190,
+    "countries": 195,
     "years": 26,
     "growth_pct": 80.4
   }
