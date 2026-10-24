@@ -2,8 +2,12 @@
 scripts/
 dataset/
 docs/
-requirements.txt
+tests/
+.github/
+requirements*.txt
+pyproject.toml
 README.md
+LICENSE
 *.py
 *.csv
 *.md

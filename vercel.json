@@ -8,9 +8,6 @@
   "ignoreCommand": "exit 1",
   "cleanUrls": true,
   "trailingSlash": false,
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/$1" }
-  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -19,10 +16,17 @@
       ]
     },
     {
-      "source": "/data/(.*)",
+      "source": "/data/(.*).json",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=86400" },
         { "key": "Content-Type", "value": "application/json; charset=utf-8" }
+      ]
+    },
+    {
+      "source": "/data/(.*).js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" },
+        { "key": "Content-Type", "value": "text/javascript; charset=utf-8" }
       ]
     },
     {
