@@ -16,24 +16,24 @@
 ║  • Correlações entre variáveis                                    ║
 ║                                                                   ║
 ║  Uso:                                                             ║
-║    python scripts/eda.py                                          ║
-║    python scripts/eda.py --dataset caminho/dataset.csv            ║
+║    python -m scripts.eda                                          ║
+║    python -m scripts.eda --dataset caminho/dataset.csv            ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
 
 import argparse
-import logging
 from pathlib import Path
 
 import pandas as pd
 
-from scripts.config import BIG_ECONOMIES_PT, DEFAULT_DATASET
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
+from scripts.config import (
+    BIG_ECONOMIES_PT,
+    CLUSTER_YEAR,
+    DEFAULT_DATASET,
+    YEAR_END,
+    YEAR_START,
+    is_real_country,
 )
-log = logging.getLogger("energix.eda")
 
 SEP = "=" * 70
 SEP2 = "─" * 70
@@ -83,7 +83,7 @@ def inspect_general(df: pd.DataFrame) -> None:
 def inspect_coverage(df: pd.DataFrame) -> None:
     section("2. COBERTURA TEMPORAL E GEOGRÁFICA")
 
-    real = df[df["iso_code"].notna() & (df["iso_code"].str.len() == 3)]
+    real = df[is_real_country(df)]
 
     print(f"\nTotal de entradas:       {len(df):>6,}")
     print(f"Países/regiões únicos:   {df['country'].nunique():>6,}")
@@ -91,7 +91,7 @@ def inspect_coverage(df: pd.DataFrame) -> None:
     print(f"Faixa temporal:          {df['year'].min()} – {df['year'].max()}")
     print(f"Anos disponíveis:        {df['year'].nunique()}")
     print(f"\nEntidades não-países (regiões/agregados):")
-    non_real = df[df["iso_code"].isna() | (df["iso_code"].str.len() != 3)]["country"].unique()
+    non_real = df[~is_real_country(df)]["country"].unique()
     for ent in sorted(non_real)[:20]:
         print(f"  {ent}")
     if len(non_real) > 20:
@@ -101,11 +101,7 @@ def inspect_coverage(df: pd.DataFrame) -> None:
 def inspect_stats(df: pd.DataFrame) -> None:
     section("3. ESTATÍSTICAS DESCRITIVAS — PAÍSES REAIS (2000–2025)")
 
-    real = df[
-        df["iso_code"].notna()
-        & (df["iso_code"].str.len() == 3)
-        & df["year"].between(2000, 2025)
-    ]
+    real = df[is_real_country(df) & df["year"].between(YEAR_START, YEAR_END)]
 
     stats = real[KEY_COLS].describe().round(2)
     print(f"\n{stats.to_string()}")
@@ -130,8 +126,8 @@ def inspect_world(df: pd.DataFrame) -> None:
         )
 
     # Crescimento
-    ren_00 = world[world["year"] == 2000]["renewables_share_elec"].values[0]
-    ren_25 = world[world["year"] == 2025]["renewables_share_elec"].values[0]
+    ren_00 = world[world["year"] == YEAR_START]["renewables_share_elec"].values[0]
+    ren_25 = world[world["year"] == YEAR_END]["renewables_share_elec"].values[0]
     print(f"\nCrescimento renovável 2000→2025:")
     print(f"  {ren_00:.2f}% → {ren_25:.2f}%  (Δ {ren_25-ren_00:+.2f} pp / {(ren_25-ren_00)/ren_00*100:+.1f}%)")
 
@@ -139,15 +135,11 @@ def inspect_world(df: pd.DataFrame) -> None:
 def inspect_ranking(df: pd.DataFrame) -> None:
     section("5. RANKING 2024 — TOP 15 e BOTTOM 10")
 
-    mask  = (
-        df["iso_code"].notna()
-        & (df["iso_code"].str.len() == 3)
-        & (df["year"] == 2024)
-    )
+    mask  = is_real_country(df) & (df["year"] == CLUSTER_YEAR)
     rank  = df[mask].dropna(subset=["renewables_share_elec"])
     rank  = rank.sort_values("renewables_share_elec", ascending=False).reset_index(drop=True)
 
-    print(f"\nTotal de países com dados em 2024: {len(rank)}")
+    print(f"\nTotal de países com dados em {CLUSTER_YEAR}: {len(rank)}")
     print(f"\n{'Pos':>4}  {'País':<35}  {'Renov%':>8}")
     print(SEP2)
     for i, row in rank.head(15).iterrows():
@@ -162,7 +154,7 @@ def inspect_big_economies(df: pd.DataFrame) -> None:
     section("6. GRANDES ECONOMIAS — 2000 a 2025")
 
     countries = list(BIG_ECONOMIES_PT)
-    data = df[df["country"].isin(countries) & df["year"].between(2000, 2025)]
+    data = df[df["country"].isin(countries) & df["year"].between(YEAR_START, YEAR_END)]
     pivot = (
         data.pivot(index="year", columns="country", values="renewables_share_elec")
         .round(1)
@@ -182,11 +174,7 @@ def inspect_brazil(df: pd.DataFrame) -> None:
 def inspect_correlations(df: pd.DataFrame) -> None:
     section("8. MATRIZ DE CORRELAÇÃO — PAÍSES REAIS 2024")
 
-    mask = (
-        df["iso_code"].notna()
-        & (df["iso_code"].str.len() == 3)
-        & (df["year"] == 2024)
-    )
+    mask = is_real_country(df) & (df["year"] == CLUSTER_YEAR)
     corr = df[mask][KEY_COLS].corr().round(3)
     print(f"\n{corr.to_string()}")
 

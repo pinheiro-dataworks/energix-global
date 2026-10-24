@@ -17,44 +17,36 @@
 ║  5. Regressão Polinomial Grau 2 + Projeção 2026–2030             ║
 ║  6. Serialização para JSON                                        ║
 ║                                                                   ║
-║  Uso:                                                             ║
-║    python scripts/process_data.py                                 ║
-║    python scripts/process_data.py --dataset caminho/dataset.csv  ║
-║    python scripts/process_data.py --output pasta/saida           ║
+║  Uso (a partir da raiz do repositório):                           ║
+║    python -m scripts.process_data                                 ║
+║    python -m scripts.process_data --dataset caminho/dataset.csv  ║
+║    python -m scripts.process_data --output pasta/saida           ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
 
 import argparse
 import json
 import logging
-import os
-import sys
-import warnings
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 
+from scripts.clustering import run_clustering
 from scripts.config import (
     BIG_ECONOMIES_PT,
     CLUSTER_ORDER,
+    CLUSTER_YEAR,
     CONTINENT_MAP,
-    COUNTRY_TO_CONTINENT,
     DEFAULT_DATASET,
     DEFAULT_OUTPUT,
+    REQUIRED_COLS,
+    YEAR_END,
+    YEAR_START,
+    continent_of,
+    is_real_country,
 )
+from scripts.forecast import run_polynomial_forecast
 
-warnings.filterwarnings("ignore")
-
-# ── Logging ────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(message)s",
-    datefmt="%H:%M:%S",
-)
 log = logging.getLogger("energix")
 
 # ══════════════════════════════════════════════════════════════════
@@ -62,26 +54,25 @@ log = logging.getLogger("energix")
 # ══════════════════════════════════════════════════════════════════
 
 def load_dataset(path: Path) -> pd.DataFrame:
-    """Carrega e valida o dataset CSV."""
+    """
+    Carrega e valida o dataset CSV.
+
+    Raises:
+        FileNotFoundError — se o arquivo não existir
+        ValueError        — se faltar alguma coluna obrigatória
+    """
     log.info("Carregando dataset: %s", path)
 
+    path = Path(path)
     if not path.exists():
-        log.error("Arquivo não encontrado: %s", path)
-        sys.exit(1)
+        raise FileNotFoundError(f"Dataset não encontrado: {path}")
 
     df = pd.read_csv(path)
     log.info("Dataset carregado — shape: %s", df.shape)
 
-    required_cols = [
-        "country", "year", "iso_code",
-        "renewables_share_elec", "solar_share_elec",
-        "wind_share_elec", "hydro_share_elec",
-        "nuclear_share_elec", "fossil_share_elec",
-    ]
-    missing = [c for c in required_cols if c not in df.columns]
+    missing = [c for c in REQUIRED_COLS if c not in df.columns]
     if missing:
-        log.error("Colunas ausentes no dataset: %s", missing)
-        sys.exit(1)
+        raise ValueError(f"Colunas ausentes no dataset: {missing}")
 
     return df
 
@@ -92,12 +83,7 @@ def load_dataset(path: Path) -> pd.DataFrame:
 
 def filter_real_countries(df: pd.DataFrame) -> pd.DataFrame:
     """Mantém apenas países reais (iso_code de 3 letras) entre 2000 e 2025."""
-    mask = (
-        df["iso_code"].notna()
-        & (df["iso_code"].str.len() == 3)
-        & (df["year"] >= 2000)
-        & (df["year"] <= 2025)
-    )
+    mask = is_real_country(df) & df["year"].between(YEAR_START, YEAR_END)
     df_real = df[mask].copy()
     log.info(
         "Países reais filtrados: %d registros | %d países únicos",
@@ -118,7 +104,18 @@ def get_world(df: pd.DataFrame) -> pd.DataFrame:
 #  3. INDICADORES E KPIs GLOBAIS
 # ══════════════════════════════════════════════════════════════════
 
-def build_summary(world: pd.DataFrame) -> dict:
+def count_countries(df: pd.DataFrame, year: int = CLUSTER_YEAR) -> int:
+    """
+    Número de países reais com participação renovável informada no ano.
+
+    Usa 2024 por padrão porque 2025 ainda é parcial no OWID (cerca de
+    metade dos países tem dado). É o mesmo universo do ranking.
+    """
+    mask = is_real_country(df) & (df["year"] == year)
+    return int(df.loc[mask, "renewables_share_elec"].notna().sum())
+
+
+def build_summary(world: pd.DataFrame, n_countries: int) -> dict:
     """Calcula os indicadores-chave do painel."""
     log.info("Calculando summary / KPIs globais…")
 
@@ -126,27 +123,27 @@ def build_summary(world: pd.DataFrame) -> dict:
         row = world[world["year"] == year]
         return float(row[col].values[0]) if len(row) else 0.0
 
-    ren_2000  = _w(2000, "renewables_share_elec")
-    ren_2025  = _w(2025, "renewables_share_elec")
+    ren_2000  = _w(YEAR_START, "renewables_share_elec")
+    ren_2025  = _w(YEAR_END, "renewables_share_elec")
     growth_pp = ren_2025 - ren_2000
     growth_pct = round((growth_pp / ren_2000) * 100, 1) if ren_2000 else 0.0
 
     summary = {
         "renewables_2025": round(ren_2025, 2),
         "renewables_2000": round(ren_2000, 2),
-        "solar_2025":      round(_w(2025, "solar_share_elec"), 2),
-        "solar_2000":      round(_w(2000, "solar_share_elec"), 2),
-        "wind_2025":       round(_w(2025, "wind_share_elec"), 2),
-        "wind_2000":       round(_w(2000, "wind_share_elec"), 2),
-        "fossil_2025":     round(_w(2025, "fossil_share_elec"), 2),
-        "fossil_2000":     round(_w(2000, "fossil_share_elec"), 2),
-        "countries":       190,
-        "years":           26,
+        "solar_2025":      round(_w(YEAR_END, "solar_share_elec"), 2),
+        "solar_2000":      round(_w(YEAR_START, "solar_share_elec"), 2),
+        "wind_2025":       round(_w(YEAR_END, "wind_share_elec"), 2),
+        "wind_2000":       round(_w(YEAR_START, "wind_share_elec"), 2),
+        "fossil_2025":     round(_w(YEAR_END, "fossil_share_elec"), 2),
+        "fossil_2000":     round(_w(YEAR_START, "fossil_share_elec"), 2),
+        "countries":       n_countries,
+        "years":           int(world["year"].nunique()),
         "growth_pct":      growth_pct,
     }
 
     log.info(
-        "Renováveis 2000→2025: %.2f%% → %.2f%%  (Δ %.2f pp / +%.1f%%)",
+        "Renováveis 2000→2025: %.2f%% → %.2f%%  (Δ %+.2f pp / %+.1f%%)",
         ren_2000, ren_2025, growth_pp, growth_pct,
     )
     return summary
@@ -167,7 +164,7 @@ def build_global_trend(world: pd.DataFrame) -> list[dict]:
 
 def build_matrix_2025(world: pd.DataFrame) -> dict:
     """Composição da matriz elétrica global em 2025."""
-    w25 = world[world["year"] == 2025].iloc[0]
+    w25 = world[world["year"] == YEAR_END].iloc[0]
     other = (
         float(w25["renewables_share_elec"])
         - float(w25["solar_share_elec"])
@@ -230,7 +227,7 @@ def build_big_economies(df: pd.DataFrame) -> dict:
     result = {}
     for eng, pt in BIG_ECONOMIES_PT.items():
         data = (
-            df[(df["country"] == eng) & (df["year"].between(2000, 2025))]
+            df[(df["country"] == eng) & (df["year"].between(YEAR_START, YEAR_END))]
             [["year", "renewables_share_elec"]]
             .dropna()
         )
@@ -243,7 +240,7 @@ def build_big_economies(df: pd.DataFrame) -> dict:
 
 def build_brazil_highlight(df: pd.DataFrame) -> dict:
     """Indicadores do Brasil em 2025."""
-    br = df[(df["country"] == "Brazil") & (df["year"] == 2025)].iloc[0]
+    br = df[(df["country"] == "Brazil") & (df["year"] == YEAR_END)].iloc[0]
     return {
         "renewables": round(float(br["renewables_share_elec"]), 1),
         "solar":      round(float(br["solar_share_elec"]),      1),
@@ -253,52 +250,14 @@ def build_brazil_highlight(df: pd.DataFrame) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════
-#  4. K-MEANS CLUSTERING
-# ══════════════════════════════════════════════════════════════════
-
-def run_kmeans(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
-    """
-    Aplica K-Means (k=5) nos dados de 2024.
-
-    Features: renewables, solar, wind, hydro, fossil share_elec.
-    Normalização: StandardScaler.
-
-    Retorna:
-        df_clust   — DataFrame com coluna 'cluster_name'
-        profiles   — dicionário com perfis dos clusters
-    """
-    from scripts.clustering import run_clustering  # importa módulo dedicado
-    return run_clustering(df)
-
-
-# ══════════════════════════════════════════════════════════════════
-#  5. REGRESSÃO POLINOMIAL + FORECAST
-# ══════════════════════════════════════════════════════════════════
-
-def run_forecast(world: pd.DataFrame) -> dict:
-    """
-    Regressão Polinomial de Grau 2 sobre a série histórica do World.
-    Projeta 2026–2030.
-
-    Retorna dict com r2, fitted histórico e previsões.
-    """
-    from scripts.forecast import run_polynomial_forecast  # importa módulo dedicado
-    return run_polynomial_forecast(world)
-
-
-# ══════════════════════════════════════════════════════════════════
-#  6. RANKING 2024
+#  4. RANKING 2024
 # ══════════════════════════════════════════════════════════════════
 
 def build_ranking(df: pd.DataFrame, df_clust: pd.DataFrame) -> list[dict]:
     """Ranking de todos os países por participação renovável em 2024."""
-    mask = (
-        df["iso_code"].notna()
-        & (df["iso_code"].str.len() == 3)
-        & (df["year"] == 2024)
-    )
+    mask = is_real_country(df) & (df["year"] == CLUSTER_YEAR)
     df_rank = df[mask].dropna(subset=["renewables_share_elec"]).copy()
-    df_rank["continent"]    = df_rank["country"].map(COUNTRY_TO_CONTINENT).fillna("Outros")
+    df_rank["continent"] = df_rank["country"].map(continent_of)
     df_rank = df_rank.merge(
         df_clust[["country", "cluster_name"]], on="country", how="left"
     )
@@ -320,11 +279,11 @@ def build_ranking(df: pd.DataFrame, df_clust: pd.DataFrame) -> list[dict]:
 
 
 # ══════════════════════════════════════════════════════════════════
-#  7. FILTROS DISPONÍVEIS
+#  5. FILTROS DISPONÍVEIS
 # ══════════════════════════════════════════════════════════════════
 
 def build_filters(df: pd.DataFrame, cluster_names: list[str]) -> dict:
-    real = df[df["iso_code"].notna() & (df["iso_code"].str.len() == 3)]
+    real = df[is_real_country(df)]
     return {
         "years":      sorted(real["year"].unique().tolist()),
         "clusters":   cluster_names,
@@ -336,65 +295,62 @@ def build_filters(df: pd.DataFrame, cluster_names: list[str]) -> dict:
 #  PIPELINE PRINCIPAL
 # ══════════════════════════════════════════════════════════════════
 
-def run_pipeline(dataset_path: Path, output_dir: Path) -> None:
-    log.info("=" * 60)
-    log.info("ENERGIX GLOBAL — Pipeline de Processamento de Dados")
-    log.info("=" * 60)
-
-    # 1. Carregar
-    df = load_dataset(dataset_path)
-
-    # 2. Filtrar países reais
+def build_data(df: pd.DataFrame) -> dict:
+    """Executa todas as etapas sobre o dataset e devolve o payload do dashboard."""
+    # Filtrar países reais e extrair o agregado World
     df_real = filter_real_countries(df)
+    world   = get_world(df)
 
-    # 3. Dados World
-    world = get_world(df)
-
-    # 4. KPIs e séries
-    summary      = build_summary(world)
-    global_trend = build_global_trend(world)
-    matrix_2025  = build_matrix_2025(world)
+    # KPIs e séries
+    summary       = build_summary(world, count_countries(df))
+    global_trend  = build_global_trend(world)
+    matrix_2025   = build_matrix_2025(world)
     solar_series, wind_series = build_solar_wind_series(world)
-    composition  = build_composition(world)
+    composition   = build_composition(world)
     annual_growth = build_annual_growth(world)
     big_economies = build_big_economies(df)
     brazil        = build_brazil_highlight(df)
 
-    # 5. K-Means
+    # K-Means
     log.info("Executando K-Means Clustering…")
-    from scripts.clustering import run_clustering
     df_clust, cluster_profiles, scatter_data = run_clustering(df_real)
 
-    # 6. Regressão Polinomial
+    # Regressão Polinomial
     log.info("Executando Regressão Polinomial…")
-    from scripts.forecast import run_polynomial_forecast
     forecast = run_polynomial_forecast(world)
 
-    # 7. Ranking
+    # Ranking e filtros
     ranking = build_ranking(df, df_clust)
-
-    # 8. Filtros
     filters = build_filters(df, CLUSTER_ORDER)
 
-    # 9. Montar JSON
-    data = {
-        "global_trend":    global_trend,
-        "forecast":        forecast,
-        "matrix_2025":     matrix_2025,
-        "solar_series":    solar_series,
-        "wind_series":     wind_series,
-        "big_economies":   big_economies,
+    return {
+        "global_trend":     global_trend,
+        "forecast":         forecast,
+        "matrix_2025":      matrix_2025,
+        "solar_series":     solar_series,
+        "wind_series":      wind_series,
+        "big_economies":    big_economies,
         "brazil_highlight": brazil,
-        "scatter_data":    scatter_data,
+        "scatter_data":     scatter_data,
         "cluster_profiles": cluster_profiles,
-        "ranking":         ranking,
-        "annual_growth":   annual_growth,
-        "composition":     composition,
-        "filters":         filters,
-        "summary":         summary,
+        "cluster_metrics":  df_clust.attrs.get("metrics", {}),
+        "ranking":          ranking,
+        "annual_growth":    annual_growth,
+        "composition":      composition,
+        "filters":          filters,
+        "summary":          summary,
     }
 
-    # 10. Salvar
+
+def run_pipeline(dataset_path: Path, output_dir: Path) -> dict:
+    log.info("=" * 60)
+    log.info("ENERGIX GLOBAL — Pipeline de Processamento de Dados")
+    log.info("=" * 60)
+
+    df   = load_dataset(dataset_path)
+    data = build_data(df)
+
+    # Salvar
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "data.json"
     with open(output_path, "w", encoding="utf-8") as f:
@@ -407,6 +363,7 @@ def run_pipeline(dataset_path: Path, output_dir: Path) -> None:
              len(data["ranking"]), len(data["scatter_data"]))
     log.info("Pipeline concluído com sucesso ✓")
     log.info("=" * 60)
+    return data
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -430,5 +387,10 @@ def parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s  %(levelname)-8s  %(message)s",
+        datefmt="%H:%M:%S",
+    )
     args = parse_args()
     run_pipeline(args.dataset, args.output)
