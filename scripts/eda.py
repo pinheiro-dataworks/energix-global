@@ -76,7 +76,7 @@ def inspect_general(df: pd.DataFrame) -> None:
         pct  = miss / len(df) * 100
         print(f"  {col:<40}  dtype={str(df[col].dtype):<10}  nulos={miss:>5} ({pct:5.1f}%)")
 
-    print(f"\nPrimeiros registros:")
+    print("\nPrimeiros registros:")
     print(df.head(3).to_string())
 
 
@@ -90,7 +90,7 @@ def inspect_coverage(df: pd.DataFrame) -> None:
     print(f"Países reais (ISO-3):    {real['country'].nunique():>6,}")
     print(f"Faixa temporal:          {df['year'].min()} – {df['year'].max()}")
     print(f"Anos disponíveis:        {df['year'].nunique()}")
-    print(f"\nEntidades não-países (regiões/agregados):")
+    print("\nEntidades não-países (regiões/agregados):")
     non_real = df[~is_real_country(df)]["country"].unique()
     for ent in sorted(non_real)[:20]:
         print(f"  {ent}")
@@ -112,7 +112,10 @@ def inspect_world(df: pd.DataFrame) -> None:
 
     world = df[df["country"] == "World"].sort_values("year")
 
-    print(f"\n{'Ano':<6} {'Renov%':>8} {'Solar%':>8} {'Eólica%':>9} {'Hidro%':>8} {'Nucl%':>7} {'Fóssil%':>9}")
+    print(
+        f"\n{'Ano':<6} {'Renov%':>8} {'Solar%':>8} {'Eólica%':>9} "
+        f"{'Hidro%':>8} {'Nucl%':>7} {'Fóssil%':>9}"
+    )
     print(SEP2)
     for _, r in world.iterrows():
         print(
@@ -128,8 +131,10 @@ def inspect_world(df: pd.DataFrame) -> None:
     # Crescimento
     ren_00 = world[world["year"] == YEAR_START]["renewables_share_elec"].values[0]
     ren_25 = world[world["year"] == YEAR_END]["renewables_share_elec"].values[0]
-    print(f"\nCrescimento renovável 2000→2025:")
-    print(f"  {ren_00:.2f}% → {ren_25:.2f}%  (Δ {ren_25-ren_00:+.2f} pp / {(ren_25-ren_00)/ren_00*100:+.1f}%)")
+    print("\nCrescimento renovável 2000→2025:")
+    delta_pp  = ren_25 - ren_00
+    delta_pct = delta_pp / ren_00 * 100
+    print(f"  {ren_00:.2f}% → {ren_25:.2f}%  (Δ {delta_pp:+.2f} pp / {delta_pct:+.1f}%)")
 
 
 def inspect_ranking(df: pd.DataFrame) -> None:
@@ -185,7 +190,7 @@ def inspect_correlations(df: pd.DataFrame) -> None:
 
 def run_eda(path: Path) -> None:
     print(f"\n{'#'*70}")
-    print(f"  ENERGIX GLOBAL — Análise Exploratória de Dados (EDA)")
+    print("  ENERGIX GLOBAL — Análise Exploratória de Dados (EDA)")
     print(f"{'#'*70}")
 
     df = _load(path)

@@ -256,8 +256,14 @@ if __name__ == "__main__":
 
     # Resumo por cluster
     print("\n──────────────────────────────────────────")
-    print(f"{'Cluster':<22} {'Países':>7}  {'Renov%':>7}  {'Solar%':>6}  {'Eólica%':>7}  {'Hidro%':>6}  {'Fóssil%':>7}")
+    print(
+        f"{'Cluster':<22} {'Países':>7}  {'Renov%':>7}  {'Solar%':>6}  "
+        f"{'Eólica%':>7}  {'Hidro%':>6}  {'Fóssil%':>7}"
+    )
     print("──────────────────────────────────────────")
     for name, p in profiles.items():
-        print(f"{name:<22} {p['count']:>7}  {p['renewables']:>7.1f}  {p['solar']:>6.1f}  {p['wind']:>7.1f}  {p['hydro']:>6.1f}  {p['fossil']:>7.1f}")
+        print(
+            f"{name:<22} {p['count']:>7}  {p['renewables']:>7.1f}  {p['solar']:>6.1f}  "
+            f"{p['wind']:>7.1f}  {p['hydro']:>6.1f}  {p['fossil']:>7.1f}"
+        )
     print("──────────────────────────────────────────\n")

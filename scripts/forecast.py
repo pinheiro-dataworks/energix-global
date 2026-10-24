@@ -171,7 +171,7 @@ def run_polynomial_forecast(
     # Valores ajustados históricos
     historical_fitted = [
         {"year": int(yr), "fitted": round(float(f), 3)}
-        for yr, f in zip(series["year"].values, y_pred)
+        for yr, f in zip(series["year"].values, y_pred, strict=True)
     ]
 
     # Projeção futura (a partir do ano seguinte ao último observado)
@@ -182,7 +182,7 @@ def run_polynomial_forecast(
 
     prev_val = float(y[-1])
     forecast_list = []
-    for yr, val in zip(future_years.flatten(), y_fut):
+    for yr, val in zip(future_years.flatten(), y_fut, strict=True):
         forecast_list.append({
             "year":  int(yr),
             "value": round(float(val), 2),
